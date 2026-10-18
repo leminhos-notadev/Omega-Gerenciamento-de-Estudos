@@ -1,15 +1,53 @@
+name: Gerar instaladores
 
-name: Testar GitHub Actions
-
+# Roda quando você cria uma versão (tag que começa com "v", ex.: v1.0.0) ou manualmente na aba Actions.
 on:
   push:
+    tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write   # necessário para anexar os arquivos na Release
+
 jobs:
-  teste:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt pyinstaller
+      - run: pyinstaller --noconfirm --clean --windowed --name Omega --icon assets/icon.ico --add-data "assets;assets" omega.py
+      - run: choco install innosetup -y
+      - run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\omega.iss'
+      - uses: actions/upload-artifact@v4
+        with: { name: Omega-Setup-Windows, path: installer_out/Omega-Setup.exe }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: installer_out/Omega-Setup.exe }
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: sh build_mac_linux.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: Omega-macOS, path: Omega.dmg }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: Omega.dmg }
+
+  linux:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar código
-        uses: actions/checkout@v4
-      - name: Confirmar execução
-        run: echo "GitHub Actions funcionando"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: sh build_mac_linux.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: Omega-Linux, path: Omega-linux.tar.gz }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: Omega-linux.tar.gz }
