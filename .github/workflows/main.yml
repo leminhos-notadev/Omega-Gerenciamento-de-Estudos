@@ -1,0 +1,15 @@
+
+name: Testar GitHub Actions
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Confirmar execução
+        run: echo "GitHub Actions funcionando"
