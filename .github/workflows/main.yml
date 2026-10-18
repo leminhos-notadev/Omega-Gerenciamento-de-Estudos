@@ -1,53 +1,178 @@
+
 name: Gerar instaladores
 
-# Roda quando você cria uma versão (tag que começa com "v", ex.: v1.0.0) ou manualmente na aba Actions.
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
-  contents: write   # necessário para anexar os arquivos na Release
+  contents: write
 
 jobs:
   windows:
+    name: Compilar Windows
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --noconfirm --clean --windowed --name Omega --icon assets/icon.ico --add-data "assets;assets" omega.py
-      - run: choco install innosetup -y
-      - run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\omega.iss'
-      - uses: actions/upload-artifact@v4
-        with: { name: Omega-Setup-Windows, path: installer_out/Omega-Setup.exe }
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with: { files: installer_out/Omega-Setup.exe }
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Compilar aplicativo
+        run: >
+          pyinstaller --noconfirm --clean --windowed
+          --name Omega
+          --icon assets/icon.ico
+          --add-data "assets;assets"
+          omega.py
+
+      - name: Instalar Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Gerar instalador
+        shell: pwsh
+        run: |
+          $installerOut = Join-Path $env:GITHUB_WORKSPACE "installer_out"
+          New-Item -ItemType Directory -Force -Path $installerOut | Out-Null
+
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+          if (!(Test-Path $iscc)) {
+            throw "Inno Setup não encontrado: $iscc"
+          }
+
+          if (!(Test-Path "installer\omega.iss")) {
+            throw "Arquivo installer\omega.iss não encontrado."
+          }
+
+          & $iscc "/O$installerOut" "/FOmega-Setup" "installer\omega.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          if (!(Test-Path "$installerOut\Omega-Setup.exe")) {
+            throw "O instalador Omega-Setup.exe não foi gerado."
+          }
+
+      - name: Guardar instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: Omega-Windows
+          path: installer_out/Omega-Setup.exe
+          if-no-files-found: error
 
   macos:
+    name: Compilar macOS
     runs-on: macos-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - run: sh build_mac_linux.sh
-      - uses: actions/upload-artifact@v4
-        with: { name: Omega-macOS, path: Omega.dmg }
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with: { files: Omega.dmg }
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Compilar aplicativo
+        run: |
+          pyinstaller --noconfirm --clean --windowed \
+            --name Omega \
+            --add-data "assets:assets" \
+            omega.py
+
+      - name: Gerar arquivo DMG
+        run: |
+          test -d "dist/Omega.app"
+          hdiutil create \
+            -volname "Omega" \
+            -srcfolder "dist/Omega.app" \
+            -ov \
+            -format UDZO \
+            "Omega.dmg"
+
+      - name: Guardar instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: Omega-macOS
+          path: Omega.dmg
+          if-no-files-found: error
 
   linux:
+    name: Compilar Linux
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - run: sh build_mac_linux.sh
-      - uses: actions/upload-artifact@v4
-        with: { name: Omega-Linux, path: Omega-linux.tar.gz }
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with: { files: Omega-linux.tar.gz }
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Compilar aplicativo
+        run: |
+          pyinstaller --noconfirm --clean --windowed \
+            --name Omega \
+            --add-data "assets:assets" \
+            omega.py
+
+      - name: Gerar arquivo TAR.GZ
+        run: |
+          test -d "dist/Omega"
+          tar -czf Omega-linux.tar.gz -C dist Omega
+
+      - name: Guardar aplicativo
+        uses: actions/upload-artifact@v4
+        with:
+          name: Omega-Linux
+          path: Omega-linux.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publicar Release
+    runs-on: ubuntu-latest
+    needs:
+      - windows
+      - macos
+      - linux
+
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Baixar todos os arquivos
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publicar instaladores na Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/Omega-Setup.exe
+            release-assets/Omega.dmg
+            release-assets/Omega-linux.tar.gz
