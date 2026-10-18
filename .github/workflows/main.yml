@@ -30,13 +30,15 @@ jobs:
           python -m pip install -r omega/requirements.txt pyinstaller
 
 
+
       - name: Compilar aplicativo
         run: >
           pyinstaller --noconfirm --clean --windowed
           --name Omega
-          --icon assets/icon.ico
-          --add-data "assets;assets"
-          omega.py
+           --icon omega/assets/icon.ico
+          --add-data "omega/assets;assets"
+          omega/omega.py
+
 
       - name: Instalar Inno Setup
         run: choco install innosetup -y --no-progress
@@ -92,12 +94,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r omega/requirements.txt pyinstaller
 
+
       - name: Compilar aplicativo
         run: |
           pyinstaller --noconfirm --clean --windowed \
-            --name Omega \
-            --add-data "assets:assets" \
-            omega.py
+          --name Omega \
+          --add-data "omega/assets:assets" \
+          omega/omega.py
+
 
       - name: Gerar arquivo DMG
         run: |
@@ -137,9 +141,10 @@ jobs:
       - name: Compilar aplicativo
         run: |
           pyinstaller --noconfirm --clean --windowed \
-            --name Omega \
-            --add-data "assets:assets" \
-            omega.py
+          --name Omega \
+          --add-data "omega/assets:assets" \
+          omega/omega.py
+
 
       - name: Gerar arquivo TAR.GZ
         run: |
