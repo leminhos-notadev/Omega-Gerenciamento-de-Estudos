@@ -31,13 +31,10 @@ jobs:
 
 
 
+      
       - name: Compilar aplicativo
-        run: >
-          pyinstaller --noconfirm --clean --windowed
-          --name Omega
-           --icon omega/assets/icon.ico
-          --add-data "omega/assets;assets"
-          omega/omega.py
+        shell: pwsh
+        run: pyinstaller --noconfirm --clean --windowed --name Omega --icon omega/assets/icon.ico --add-data "omega/assets;assets" omega/omega.py
 
 
       - name: Instalar Inno Setup
