@@ -12,4 +12,8 @@ Funcionalidades
 - Simulados / Redações: um diário para adicionar seus simulados e redações, ver onde você está indo bem ou mal e também observar o progresso feito ao longo de seus estudos :)
 -  Personalização: escolha a cor que mais lhe agrada, além de poder escolher entre modo claro e escuro!
 
+Para instalar:
+- Windows: inicie "build-windows"
+- MacOS / Linux: inicie "build_mac_linux"
+
 Boa sorte em seus estudos!!
