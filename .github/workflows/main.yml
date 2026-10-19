@@ -81,23 +81,25 @@ jobs:
           python -m pip install -r omega/requirements.txt pyinstaller
 
 
-      - name: Compilar aplicativo
-        run: |
-          pyinstaller --noconfirm --clean --windowed \
-          --name Omega \
-          --add-data "omega/assets:assets" \
-          omega/omega.py
 
+      - name: Compilar aplicativo
+        working-directory: omega
+        run: |
+          python -m PyInstaller --noconfirm --clean --windowed \
+            --name Omega \
+            --add-data "assets:assets" \
+            omega.py
 
       - name: Gerar arquivo DMG
         run: |
-          test -d "dist/Omega.app"
+          test -d "omega/dist/Omega.app"
           hdiutil create \
             -volname "Omega" \
-            -srcfolder "dist/Omega.app" \
+            -srcfolder "omega/dist/Omega.app" \
             -ov \
             -format UDZO \
             "Omega.dmg"
+
 
       - name: Guardar instalador
         uses: actions/upload-artifact@v4
