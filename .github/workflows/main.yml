@@ -51,12 +51,12 @@ jobs:
           if (!(Test-Path $iscc)) {
             throw "Inno Setup não encontrado: $iscc"
           }
-
+          
           if (!(Test-Path "installer\omega.iss")) {
             throw "Arquivo installer\omega.iss não encontrado."
           }
 
-          & $iscc "/O$installerOut" "/FOmega-Setup" "installer\omega.iss"
+          & $iscc "/O$installerOut" "/FOmega-Setup" "omega\installer\omega.iss"
 
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
