@@ -29,13 +29,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r omega/requirements.txt pyinstaller
 
-
-
       - name: Compilar aplicativo
+        working-directory: omega
         shell: pwsh
-        run: pyinstaller --noconfirm --clean --windowed --name Omega --icon "omega/assets/icon.ico" --add-data "omega/assets;assets" "omega/omega.py"
-
-
+        run: pyinstaller --noconfirm --clean --windowed --name Omega --icon "assets/icon.ico" --add-data "assets;assets" omega.py
 
       - name: Instalar Inno Setup
         run: choco install innosetup -y --no-progress
@@ -47,24 +44,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path $installerOut | Out-Null
 
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          $iss  = Join-Path $env:GITHUB_WORKSPACE "omega\installer\omega.iss"
 
-          if (!(Test-Path $iscc)) {
-            throw "Inno Setup não encontrado: $iscc"
-          }
-          
-          if (!(Test-Path "installer\omega.iss")) {
-            throw "Arquivo installer\omega.iss não encontrado."
-          }
+          if (!(Test-Path $iscc)) { throw "Inno Setup não encontrado: $iscc" }
+          if (!(Test-Path $iss))  { throw "Arquivo não encontrado: $iss" }
+          if (!(Test-Path "omega\dist\Omega\Omega.exe")) { throw "A compilação não gerou omega\dist\Omega\Omega.exe" }
 
-          & $iscc "/O$installerOut" "/FOmega-Setup" "omega\installer\omega.iss"
+          & $iscc "/O$installerOut" "/FOmega-Setup" $iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          if (!(Test-Path "$installerOut\Omega-Setup.exe")) {
-            throw "O instalador Omega-Setup.exe não foi gerado."
-          }
+          if (!(Test-Path "$installerOut\Omega-Setup.exe")) { throw "O instalador Omega-Setup.exe não foi gerado." }
 
       - name: Guardar instalador
         uses: actions/upload-artifact@v4
@@ -72,7 +61,7 @@ jobs:
           name: Omega-Windows
           path: installer_out/Omega-Setup.exe
           if-no-files-found: error
-
+          
   macos:
     name: Compilar macOS
     runs-on: macos-latest
