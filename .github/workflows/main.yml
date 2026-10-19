@@ -30,17 +30,11 @@ jobs:
           python -m pip install -r omega/requirements.txt pyinstaller
 
 
+
       - name: Compilar aplicativo
         shell: pwsh
-        run: |
-            pyinstaller `
-            --noconfirm `
-            --clean `
-            --windowed `
-            --name Omega `
-            --icon "omega/assets/icon.ico" `
-            --add-data "omega/assets;assets" `
-            "omega/omega.py"
+        run: pyinstaller --noconfirm --clean --windowed --name Omega --icon "omega/assets/icon.ico" --add-data "omega/assets;assets" "omega/omega.py"
+
 
 
       - name: Instalar Inno Setup
