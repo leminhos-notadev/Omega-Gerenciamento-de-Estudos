@@ -7,6 +7,7 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
+VERSION = "1.1.0"
 RES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "assets"
 HOME = Path(os.environ.get("OMEGA_HOME", Path.home() / ".omega"))
 CFG, CACHE = HOME / "config.json", HOME / "cache"
@@ -15,6 +16,10 @@ IMG_EXT = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"}
 DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]          # ordem do python (weekday)
 DIAS_DOM = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]      # calendário começando no domingo
 MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+NAV = [("chart", "Início"), ("timer", "Foco"), ("tasks", "Tarefas"), ("book", "Edital"), ("calendar", "Calendário"),
+       ("cycle", "Cronograma / Ciclo"), ("doc", "Simulados"), ("pencil", "Redação"), ("gear", "Configurações")]
+PALETTE = ["#ff5a5f", "#ff9f43", "#ffd166", "#7fd957", "#2ecc9a", "#5ec2f2", "#4a7cff", "#8e6bff", "#d96bff", "#f27ab0", "#9aa0a6", "#c58b5a"]
+PERIODS = ["Dia", "Semana", "Mês", "Bimestre", "Trimestre", "Semestre", "Ano"]
 MODE_NAMES = {"timer": "Temporizador", "pomodoro": "Pomodoro", "stopwatch": "Cronômetro", "manual": "Manual"}
 ACCENTS = {"Roxo": "#5e17eb", "Amarelo": "#f5b83d", "Verde": "#3ecf6a", "Vermelho": "#f04a4a",
            "Azul claro": "#3fb4f5", "Azul escuro": "#2748d6", "Rosa": "#f05aa8"}
@@ -84,13 +89,21 @@ QCalendarWidget QWidget#qt_calendar_navigationbar{{background:{card}}}
 QCalendarWidget QMenu{{background:{card}}}
 """
 
+def app_icon():
+    """Ícone do aplicativo (janela / barra de tarefas): Ω na cor de destaque, fundo transparente."""
+    ic = QIcon()
+    for sz in (256, 128, 64, 48, 32, 16):
+        pm = QPixmap(sz, sz); pm.fill(Qt.transparent); lg = logo_pix(T["accent"], int(sz * .78)); w, h = lg.width() / lg.devicePixelRatio(), lg.height() / lg.devicePixelRatio()
+        p = QPainter(pm); p.drawPixmap(QPointF((sz - w) / 2, (sz - h) / 2), lg); p.end(); ic.addPixmap(pm)
+    return ic
+
 def apply_theme(app, mode, accent):
     set_theme(mode, accent)
     pal = QPalette()
     for r, k in [(QPalette.Window, "bg"), (QPalette.WindowText, "text"), (QPalette.Base, "field"), (QPalette.AlternateBase, "card"), (QPalette.Text, "text"),
                  (QPalette.Button, "btn"), (QPalette.ButtonText, "text"), (QPalette.Highlight, "accent"), (QPalette.HighlightedText, "on_accent"),
                  (QPalette.PlaceholderText, "muted"), (QPalette.ToolTipBase, "card"), (QPalette.ToolTipText, "text")]: pal.setColor(r, QColor(T[k]))
-    app.setPalette(pal); app.setStyleSheet(qss()); retheme_all()
+    app.setPalette(pal); app.setStyleSheet(qss()); retheme_all(); app.setWindowIcon(app_icon())
     for w in app.allWidgets(): w.update()
 
 # ───────────────────────── ícones vetoriais ─────────────────────────
@@ -123,6 +136,9 @@ ICONS = {
     "mute": [("P", [(4, 9), (8, 9), (13, 5), (13, 19), (8, 15), (4, 15)]), ("L", [(16, 9), (21, 15)]), ("L", [(21, 9), (16, 15)])],
     "shuffle": [("L", [(3, 7), (8, 7), (16, 17), (19, 17)]), ("L", [(3, 17), (8, 17), (11, 13)]), ("L", [(13, 11), (16, 7), (19, 7)]), ("P", [(18, 4), (18, 10), (22, 7)]), ("P", [(18, 14), (18, 20), (22, 17)])],
     "up": [("W", 2.6), ("L", [(6, 15), (12, 9), (18, 15)])], "down": [("W", 2.6), ("L", [(6, 9), (12, 15), (18, 9)])],
+    "repeat": [("PATH", "M5,11 Q5,6,10,6 L18,6"), ("P", [(16, 3), (16, 9), (20, 6)]), ("PATH", "M19,13 Q19,18,14,18 L6,18"), ("P", [(8, 15), (8, 21), (4, 18)])],
+    "eye_off": [("PATH", "M2,12 Q12,3,22,12 Q12,21,2,12"), ("L", [(4, 4), (20, 20)])],
+    "sun": [("C", 12, 12, 4), ("TICKS", 12, 12, 7, 10, 8)],
     "list": [("L", [(4, 7), (15, 7)]), ("L", [(4, 12), (15, 12)]), ("L", [(4, 17), (11, 17)]), ("P", [(16, 13), (16, 21), (21, 17)])],
 }
 _PIX = {}
@@ -251,8 +267,9 @@ def fresh():
         "settings": {"user": "", "timer_min": 25, "pomo_study": 25, "pomo_break": 5, "pomo_long": 15, "pomo_cycles": 4,
                      "alarm_timer": "", "alarm_study": "", "alarm_break": "", "bg": "", "vol": 60, "intro": True,
                      "mode": "dark", "accent": "Roxo", "pin": False, "plan_mode": "schedule",
-                     "pomo_use_long": True, "pomo_total": 0, "fullscreen": True, "active_cycle": ""},
-        "version": 3, "subjects": [], "tags": [], "sessions": [], "lists": [{"id": uid(), "name": "Lista nº 1", "tasks": []}],
+                     "pomo_use_long": True, "pomo_total": 0, "fullscreen": True, "active_cycle": "",
+                     "pomo_manual": False, "music_loop": True, "hidden_tabs": [], "hide_myday": False, "done_open": {}},
+        "version": 4, "colors": {"subjects": {}, "tags": {}}, "myday": [], "subjects": [], "tags": [], "sessions": [], "lists": [{"id": uid(), "name": "Lista nº 1", "tasks": []}],
         "syllabus": {}, "events": [], "exams": [], "essays": [], "library": [], "playlists": [],
         "schedules": [{"id": uid(), "name": "Cronograma 1", "blocks": []}], "cycles": [],
     }
@@ -263,10 +280,11 @@ def merge(d):
     f = fresh(); ver = d.get("version", 2)
     for k, v in f.items(): d.setdefault(k, v)
     for k, v in f["settings"].items(): d["settings"].setdefault(k, v)
+    for k in ("subjects", "tags"): d["colors"].setdefault(k, {})
     if ver < 3:   # versões antigas já vinham com matérias/tags de exemplo: remove se ainda forem as originais
         if d["subjects"] in OLD_SUBJECTS: d["subjects"] = []
         if d["tags"] == OLD_TAGS: d["tags"] = []
-    d["version"] = 3
+    d["version"] = 4
     return d
 
 class Store:
@@ -308,6 +326,38 @@ def buckets(per, n, off):
         else: a = dt.date(t.year - k, 1, 1); b = dt.date(t.year - k + 1, 1, 1); lab = str(a.year)
         out.append((lab, a, b))
     return out
+def period_buckets(per, off):
+    """Retorna (rótulo do intervalo, [(rótulo, início, fim)], início, fim) com datetimes. off = quantos períodos para trás."""
+    t = today(); D = dt.datetime.combine; one = dt.timedelta(days=1); mn = dt.time.min
+    def months(y, m0, n):
+        out = []
+        for k in range(n):
+            y2, m2 = divmod(y * 12 + m0 - 1 + k, 12); m2 += 1; a = dt.date(y2, m2, 1); y3, m3 = divmod(y2 * 12 + m2, 12); out.append((MESES[m2 - 1][:3], D(a, mn), D(dt.date(y3, m3 + 1, 1), mn)))
+        return out
+    def weeks(a, b):
+        out = []; c = a
+        while c < b: nx = min(b, c + dt.timedelta(days=7 - c.weekday())); out.append((c.strftime("%d/%m"), D(c, mn), D(nx, mn))); c = nx
+        return out
+    if per == "Dia":
+        d = t - off * one; a = D(d, mn); bk = [(f"{h:02d}h", a + dt.timedelta(hours=h), a + dt.timedelta(hours=h + 1)) for h in range(24)]; lab = d.strftime("%d/%m/%Y") + "  ·  00:00 – 23:59"
+    elif per == "Semana":
+        m = t - dt.timedelta(days=t.weekday()) - dt.timedelta(weeks=off); bk = [(f"{DIAS[i]} {(m + i * one).day:02d}", D(m + i * one, mn), D(m + (i + 1) * one, mn)) for i in range(7)]; lab = f"{m.strftime('%d/%m/%Y')} – {(m + 6 * one).strftime('%d/%m/%Y')}"
+    elif per == "Mês":
+        y, m0 = divmod(t.year * 12 + t.month - 1 - off, 12); m0 += 1; first = dt.date(y, m0, 1); y2, m2 = divmod(y * 12 + m0, 12); last = dt.date(y2, m2 + 1, 1); n = (last - first).days
+        bk = [(str(i + 1), D(first + i * one, mn), D(first + (i + 1) * one, mn)) for i in range(n)]; lab = f"{MESES[m0 - 1]} {y}"
+    elif per == "Ano":
+        y = t.year - off; bk = months(y, 1, 12); lab = str(y)
+    else:
+        n = {"Bimestre": 2, "Trimestre": 3, "Semestre": 6}[per]; per_year = 12 // n; idx = t.year * per_year + (t.month - 1) // n - off; y, k = divmod(idx, per_year); m0 = k * n + 1
+        a = dt.date(y, m0, 1); y2, m2 = divmod(y * 12 + m0 - 1 + n, 12); b = dt.date(y2, m2 + 1, 1)
+        bk = months(y, m0, n) if per == "Semestre" else weeks(a, b); lab = f"{k + 1}º {per.lower()} de {y}  ·  {MESES[m0 - 1][:3]}–{MESES[(m0 + n - 2) % 12][:3]}"
+    return lab, bk, bk[0][1], bk[-1][2]
+def session_overlap(x, a, b):
+    st = dt.datetime.fromisoformat(x["start"]); en = st + dt.timedelta(minutes=x["minutes"]); sec = (min(en, b) - max(st, a)).total_seconds()
+    return max(0.0, sec / 60)
+def minutes_in(d, a, b, sub="", tag=""):
+    return sum(session_overlap(x, a, b) for x in d["sessions"] if (not sub or x.get("subject") == sub) and (not tag or x.get("tag") == tag))
+
 def study_streak(d):
     days = {x["start"][:10] for x in d["sessions"]}; c = today()
     if iso(c) not in days: c -= dt.timedelta(days=1)
@@ -361,14 +411,18 @@ class Sound:
 class MusicPlayer(QObject):
     changed = Signal(); progress = Signal(int, int)
     def __init__(s):
-        super().__init__(); s.queue = []; s.i = -1; s.playing = False; s.p = None; s.vol = 60; s.muted = False
+        super().__init__(); s.queue = []; s.i = -1; s.playing = False; s.p = None; s.vol = 60; s.muted = False; s.loop = True
         if not NOAUDIO:
             s.p = QMediaPlayer(); s.o = QAudioOutput(); s.p.setAudioOutput(s.o)
             s.p.positionChanged.connect(lambda v: s.progress.emit(v, s.p.duration())); s.p.durationChanged.connect(lambda v: s.progress.emit(s.p.position(), v))
-            s.p.mediaStatusChanged.connect(lambda st: s.next(1) if st == QMediaPlayer.MediaStatus.EndOfMedia else None)
+            s.p.mediaStatusChanged.connect(s._status)
             s.p.playbackStateChanged.connect(s._state)
     @property
     def title(s): return s.queue[s.i]["title"] if 0 <= s.i < len(s.queue) else ""
+    def _status(s, st):
+        if st != QMediaPlayer.MediaStatus.EndOfMedia: return
+        if s.loop or s.i < len(s.queue) - 1: s.next(1)
+        else: s.p.stop(); s.playing = False; s.changed.emit()
     def _state(s, st): s.playing = st == QMediaPlayer.PlaybackState.PlayingState; s.changed.emit()
     def set_queue(s, tracks, start=0, play=True):
         s.queue = [t for t in tracks if Path(t["path"]).exists()]
@@ -472,6 +526,46 @@ def sel_id(t):
     r = t.currentRow(); it = t.item(r, 0) if r >= 0 else None
     return it.data(Qt.UserRole) if it else None
 
+import re
+_URL = re.compile(r'(https?://[^\s<>"\']+|www\.[^\s<>"\']+)')
+def _trim(u): return u.rstrip(".,;:!?)]}")
+def url_at(text, pos):
+    for m in _URL.finditer(text):
+        u = _trim(m.group(0))
+        if m.start() <= pos < m.start() + len(u): return u if u.startswith("http") else "https://" + u
+    return None
+
+class LinkHighlighter(QSyntaxHighlighter):
+    def highlightBlock(s, text):
+        f = QTextCharFormat(); f.setForeground(QColor(T["accent"])); f.setFontUnderline(True)
+        for m in _URL.finditer(text): s.setFormat(m.start(), len(_trim(m.group(0))), f)
+
+class LinkTextEdit(QTextEdit):
+    """Caixa de texto onde links (http://, https://, www.) ficam destacados e abrem no navegador com um clique."""
+    def __init__(s, *a): super().__init__(*a); s.hl = LinkHighlighter(s.document()); s.setMouseTracking(True); s.viewport().setMouseTracking(True)
+    def _link(s, pos):
+        c = s.cursorForPosition(pos); blk = c.block(); end = QTextCursor(blk); end.movePosition(QTextCursor.EndOfBlock)
+        if pos.y() > s.cursorRect(end).bottom() + 2 or (s.cursorRect(c).y() == s.cursorRect(end).y() and pos.x() > s.cursorRect(end).x() + 6): return None
+        i = c.positionInBlock(); return url_at(blk.text(), i) or (url_at(blk.text(), i - 1) if i > 0 else None)
+    def mouseMoveEvent(s, e):
+        s.viewport().setCursor(Qt.PointingHandCursor if s._link(e.position().toPoint()) else Qt.IBeamCursor); super().mouseMoveEvent(e)
+    def mouseReleaseEvent(s, e):
+        super().mouseReleaseEvent(e)
+        if e.button() == Qt.LeftButton and not s.textCursor().hasSelection():
+            u = s._link(e.position().toPoint())
+            if u: QDesktopServices.openUrl(QUrl(u))
+    def retheme(s): s.hl.rehighlight()
+
+class ElidedLabel(QLabel):
+    """Texto que termina em reticências quando não cabe."""
+    def __init__(s, size=18, weight=QFont.Light):
+        super().__init__(); s.full = ""; s.fs, s.fw = size, weight; s.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred); s.setMinimumWidth(30)
+    def setFull(s, t): s.full = t; s.setToolTip(t); s.update()
+    def sizeHint(s): return QSize(120, s.fs + 14)
+    def paintEvent(s, e):
+        p = QPainter(s); f = QFont(s.font()); f.setPixelSize(s.fs); f.setWeight(s.fw); p.setFont(f); p.setPen(QColor(T["text"]))
+        p.drawText(s.rect(), Qt.AlignLeft | Qt.AlignVCenter, QFontMetrics(f).elidedText(s.full, Qt.ElideRight, s.width()))
+
 class FormDialog(QDialog):
     """fields: (chave, rótulo, tipo, [opções]) — tipos: text,long,date,time,int,float,combo,ecombo,file,files"""
     def __init__(s, parent, title, fields, values=None):
@@ -481,7 +575,7 @@ class FormDialog(QDialog):
         for key, label, typ, *opt in fields:
             val = v.get(key)
             if typ == "text": w = QLineEdit(val or "")
-            elif typ == "long": w = QTextEdit(); w.setPlainText(val or ""); w.setFixedHeight(100)
+            elif typ == "long": w = LinkTextEdit(); w.setPlainText(val or ""); w.setFixedHeight(100)
             elif typ == "date":
                 w = QDateEdit(); w.setCalendarPopup(True); w.setDisplayFormat("dd/MM/yyyy"); w.setDate(QDate.fromString(val, Qt.ISODate) if val else QDate.currentDate())
             elif typ == "time": w = QTimeEdit(); w.setDisplayFormat("HH:mm"); w.setTime(QTime.fromString(val, "HH:mm") if val else QTime.currentTime())
@@ -508,17 +602,79 @@ class FormDialog(QDialog):
             else: out[key] = w.files()
         return out
 
-def edit_list(parent, title, items):
-    dlg = QDialog(parent); dlg.setWindowTitle(title); dlg.setMinimumWidth(380); l = QVBoxLayout(dlg); l.setContentsMargins(22, 20, 22, 20); l.addWidget(heading(title, 24))
-    lw = QListWidget(); lw.addItems(items); l.addWidget(lw)
+def color_of(d, kind, name, default=""):
+    """Cor definida pelo usuário para uma matéria/tag ('' se não houver)."""
+    return d["colors"][kind].get(name) or default
+def subj_color(d, name): return color_of(d, "subjects", name) or scolor(name)
+def on_color(hex_):
+    c = QColor(hex_); return "#17181a" if (.299 * c.red() + .587 * c.green() + .114 * c.blue()) / 255 > .66 else "#ffffff"
+
+class ColorRow(QWidget):
+    """Linha de bolinhas de cor: a primeira (riscada) = automática; a última (+) = cor personalizada."""
+    changed = Signal(str)
+    def __init__(s, value="", auto=True, size=22, gap=5):
+        super().__init__(); s.v = value; s.sz = size; s.gap = gap; s.opts = ([""] if auto else []) + PALETTE + ["+"]
+        s.setFixedSize(len(s.opts) * (size + gap) + 8, size + 10); s.setCursor(Qt.PointingHandCursor)
+    def color(s): return s.v
+    def set(s, v): s.v = v; s.update()
+    def rc(s, i): return QRectF(5 + i * (s.sz + s.gap), 5, s.sz, s.sz)
+    def paintEvent(s, e):
+        p = QPainter(s); p.setRenderHint(QPainter.Antialiasing)
+        for i, o in enumerate(s.opts):
+            r = s.rc(i); custom = o == "+" and s.v and s.v not in PALETTE
+            if o == "": p.setPen(QPen(QColor(T["muted"]), 1.6)); p.setBrush(Qt.NoBrush); p.drawEllipse(r.adjusted(2, 2, -2, -2)); p.drawLine(r.bottomLeft() + QPointF(6, -6), r.topRight() + QPointF(-6, 6))
+            elif o == "+" and not custom: p.setPen(QPen(QColor(T["muted"]), 1.6)); p.setBrush(Qt.NoBrush); p.drawEllipse(r.adjusted(2, 2, -2, -2)); p.drawPixmap(QPointF(r.x() + (s.sz - 12) / 2, r.y() + (s.sz - 12) / 2), pix("plus", T["muted"], 12))
+            else: p.setPen(Qt.NoPen); p.setBrush(QColor(s.v if custom else o)); p.drawEllipse(r.adjusted(2, 2, -2, -2))
+            if (o == s.v and o != "+") or custom: p.setBrush(Qt.NoBrush); p.setPen(QPen(QColor(T["text"]), 2.2)); p.drawEllipse(r.adjusted(-1, -1, 1, 1))
+    def mousePressEvent(s, e):
+        for i, o in enumerate(s.opts):
+            if s.rc(i).adjusted(-3, -3, 3, 3).contains(e.position()):
+                if o == "+":
+                    c = QColorDialog.getColor(QColor(s.v or T["accent"]), s, "Escolher cor")
+                    if not c.isValid(): return
+                    s.v = c.name()
+                else: s.v = o
+                s.update(); s.changed.emit(s.v); return
+
+def dot_icon(color, d=18):
+    pm = QPixmap(d, d); pm.fill(Qt.transparent); p = QPainter(pm); p.setRenderHint(QPainter.Antialiasing); p.setPen(Qt.NoPen); p.setBrush(QColor(color)); p.drawEllipse(1, 1, d - 2, d - 2); p.end(); return QIcon(pm)
+
+def edit_list(parent, title, items, colors=None):
+    """Editor de lista (matérias/tags). Se 'colors' (dict nome→cor) for passado, permite escolher a cor de cada item."""
+    dlg = QDialog(parent); dlg.setWindowTitle(title); dlg.setMinimumWidth(470); l = QVBoxLayout(dlg); l.setContentsMargins(22, 20, 22, 20); l.addWidget(heading(title, 24))
+    tmp = dict(colors) if colors is not None else None; ic = lambda n: dot_icon((tmp.get(n) if tmp is not None else "") or scolor(n))
+    lw = QListWidget()
+    for n in items: lw.addItem(QListWidgetItem(ic(n), n))
+    l.addWidget(lw); cr = None
+    if tmp is not None:
+        l.addWidget(muted("Cor do item selecionado (a primeira bolinha = automática)", 12)); cr = ColorRow(); l.addWidget(cr)
+        def cur_changed(it, _=None): cr.set(tmp.get(it.text(), "") if it else "")
+        def col_changed(v):
+            it = lw.currentItem()
+            if it:
+                if v: tmp[it.text()] = v
+                else: tmp.pop(it.text(), None)
+                it.setIcon(ic(it.text()))
+        lw.currentItemChanged.connect(cur_changed); cr.changed.connect(col_changed)
     r = QHBoxLayout(); ed = QLineEdit(); ed.setPlaceholderText("Novo item…"); a = IBtn("plus", 38); rm = IBtn("trash", 38, "dark")
     def add():
-        if ed.text().strip(): lw.addItem(ed.text().strip()); ed.clear()
-    a.clicked.connect(add); ed.returnPressed.connect(add); rm.clicked.connect(lambda: [lw.takeItem(lw.row(i)) for i in lw.selectedItems()])
-    r.addWidget(ed, 1); r.addWidget(a); r.addWidget(rm); l.addLayout(r)
+        t = ed.text().strip()
+        if t and t not in [lw.item(i).text() for i in range(lw.count())]: lw.addItem(QListWidgetItem(ic(t), t)); ed.clear(); lw.setCurrentRow(lw.count() - 1)
+    def rem():
+        for i in lw.selectedItems(): lw.takeItem(lw.row(i))
+    a.clicked.connect(add); ed.returnPressed.connect(add); rm.clicked.connect(rem); r.addWidget(ed, 1); r.addWidget(a); r.addWidget(rm); l.addLayout(r)
     bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel); bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject); l.addWidget(bb)
-    if dlg.exec(): items[:] = [lw.item(i).text() for i in range(lw.count())]; return True
+    if dlg.exec():
+        items[:] = [lw.item(i).text() for i in range(lw.count())]
+        if tmp is not None: colors.clear(); colors.update({k: v for k, v in tmp.items() if k in items and v})
+        return True
     return False
+
+def manage(parent, st, kind, title):
+    """Abre o editor de matérias ('subjects') ou tags ('tags') com cores e salva."""
+    ok = edit_list(parent, title, st.data[kind], st.data["colors"][kind])
+    if ok: st.save()
+    return ok
 
 def pick_date(parent, iso_=None, clear=False):
     """Retorna 'AAAA-MM-DD', '' (remover) ou None (cancelar)."""
@@ -552,7 +708,7 @@ class Overlay(QDialog):
         pe = QLabel(); pe.setPixmap(pix("pencil", T["muted"], 24)); x = IBtn("x", 52); x.clicked.connect(s.reject)
         r.addWidget(te, 1); r.addWidget(pe); r.addSpacing(10); r.addWidget(x); s.lay.addLayout(r); return te
     def ph_edit(s, ph, h=150):
-        t = QTextEdit(); t.setPlaceholderText(ph); t.setFixedHeight(h); t.setStyleSheet(f"background:{T['field']};border-radius:26px;padding:16px 20px;font-size:14px"); return t
+        t = LinkTextEdit(); t.setPlaceholderText(ph); t.setFixedHeight(h); t.setStyleSheet(f"background:{T['field']};border-radius:26px;padding:16px 20px;font-size:14px"); return t
     def pill_combo(s, ph, items, val=""):
         c = QComboBox(); c.addItems([ph] + items); setcb(c, val); c.setStyleSheet(f"QComboBox{{background:{T['field']};border:1px solid {T['field']};border-radius:22px;padding:11px 20px;color:{T['text']}}}")
         return c

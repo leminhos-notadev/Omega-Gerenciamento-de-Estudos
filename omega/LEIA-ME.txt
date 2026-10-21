@@ -16,6 +16,18 @@ GERAR INSTALADOR / APLICATIVO (icone = assets/icon.png)
   Actions executa .github/workflows/build.yml e entrega o Setup.exe, o .dmg e o
   .tar.gz prontos para baixar.
 
+NOVIDADES DA VERSAO 1.1.0 (v4)
+  - Cores para materias e tags (Gerenciar materias/tags) e para eventos e blocos.
+  - Abas da barra lateral configuraveis; "Meu Dia" nas Tarefas (pode ser ocultado).
+  - Tarefas concluidas ficam numa secao recolhivel; subtarefas editaveis ao clicar.
+  - Links nas descricoes abrem no navegador ao clicar.
+  - Estatisticas: dia (por hora), semana, mes, bimestre, trimestre, semestre, ano.
+  - Foco: o bloco continua ao trocar de modo; Pomodoro manual; video de fundo sem
+    esconder a interface; progresso salvo a cada minuto (recuperado se o PC desligar).
+  - Player: loop e nome longo com reticencias. Intro em tela cheia.
+  - Icone transparente (o Omega da janela segue a cor escolhida).
+  - Configuracoes: apagar todos os dados (pede o nome de usuario).
+
 NOVIDADES DA VERSAO 3
   - Pomodoro: opcao de desligar o descanso longo, escolher quantos blocos antes
     dele e (opcional) parar depois de N blocos.

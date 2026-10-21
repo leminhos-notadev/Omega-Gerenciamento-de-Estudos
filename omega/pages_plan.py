@@ -4,12 +4,12 @@ from omega_core import *
 
 HOUR_H, LEFT = 48, 62
 def tmin(s): h, m = s.split(":"); return int(h) * 60 + int(m)
-def bcolor(b): return BLOCK_COLORS[sum(map(ord, b["subject"])) % len(BLOCK_COLORS)] if b.get("subject") else BLOCK_COLORS[0]
+def bcolor(b, cmap): return b.get("color") or cmap.get(b.get("subject", "")) or BLOCK_COLORS[0]
 
 # ───────────────────────── cronograma semanal ─────────────────────────
 class WeekGrid(QWidget):
     new = Signal(int, int); edit = Signal(str)
-    def __init__(s): super().__init__(); s.blocks = []; s.rects = []; s.setFixedHeight(24 * HOUR_H + 10)
+    def __init__(s): super().__init__(); s.blocks = []; s.rects = []; s.cmap = {}; s.setFixedHeight(24 * HOUR_H + 10)
     def paintEvent(s, e):
         p = QPainter(s); p.setRenderHint(QPainter.Antialiasing); w = s.width(); cw = (w - LEFT) / 7; f = p.font(); f.setPixelSize(10); p.setFont(f)
         for h in range(25):
@@ -27,7 +27,7 @@ class WeekGrid(QWidget):
             for b in bl:
                 sm, em = tmin(b["start"]), max(tmin(b["end"]), tmin(b["start"]) + 20); bw = (cw - 6) / nl
                 r = QRectF(LEFT + day * cw + 3 + pos[b["id"]] * bw, 5 + sm / 60 * HOUR_H + 1, bw - 2, max(22, (em - sm) / 60 * HOUR_H - 2)); s.rects.append((r, b["id"]))
-                p.setBrush(QColor(bcolor(b))); p.setPen(Qt.NoPen); p.drawRoundedRect(r, 10, 10); p.setPen(QColor("#ffffff")); ft = p.font(); ft.setPixelSize(11); ft.setWeight(QFont.Bold); p.setFont(ft)
+                col = bcolor(b, s.cmap); p.setBrush(QColor(col)); p.setPen(Qt.NoPen); p.drawRoundedRect(r, 10, 10); p.setPen(QColor(on_color(col))); ft = p.font(); ft.setPixelSize(11); ft.setWeight(QFont.Bold); p.setFont(ft)
                 p.drawText(r.adjusted(8, 3, -6, -2), Qt.AlignLeft | Qt.AlignTop, QFontMetrics(ft).elidedText(b["title"], Qt.ElideRight, int(r.width() - 14)))
                 if r.height() > 36: ft.setWeight(QFont.Normal); ft.setPixelSize(10); p.setFont(ft); p.drawText(r.adjusted(8, 19, -6, -2), Qt.AlignLeft | Qt.AlignTop, f"{b['start']} – {b['end']}")
                 f2 = p.font(); f2.setPixelSize(10); p.setFont(f2)
@@ -45,18 +45,19 @@ class BlockDialog(Overlay):
         ts = f"QTimeEdit{{background:transparent;color:{T['accent']};font-size:26px;font-weight:300;padding:0}}"
         s.t1, s.t2 = QTimeEdit(), QTimeEdit()
         for w, v in ((s.t1, blk["start"] if blk else f"{hour:02d}:00"), (s.t2, blk["end"] if blk else f"{min(hour + 1, 23):02d}:{'00' if hour < 23 else '59'}")): w.setDisplayFormat("HH:mm"); w.setTime(QTime.fromString(v, "HH:mm")); w.setStyleSheet(ts)
-        s.dc = QComboBox(); s.dc.addItems(DIAS_DOM); s.dc.setCurrentIndex(blk["day"] if blk else day)
+        s.dc = QComboBox(); s.dc.addItems(DIAS_DOM); s.dc.setCurrentIndex(blk["day"] if blk else day); s.dc.setMinimumWidth(84); s.dc.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         s.dc.setStyleSheet(f"QComboBox{{background:transparent;border:none;color:{T['accent']};font-size:26px;font-weight:300;padding:0}}QComboBox::drop-down{{width:0}}")
         for w in (lab("Das"), s.t1, lab("às"), s.t2, lab("("), s.dc, lab(")")): r.addWidget(w)
         r.addStretch(); s.lay.addLayout(r); q = QHBoxLayout(); s.sub = s.pill_combo("Adicionar Matéria", d["subjects"], blk["subject"] if blk else ""); s.tag = s.pill_combo("Adicionar Tag", d["tags"], blk["tag"] if blk else "")
         q.addWidget(s.sub); q.addWidget(s.tag); s.lay.addLayout(q); s.desc = s.ph_edit("Adicionar Descrição", 150); s.desc.setPlainText(blk["desc"] if blk else ""); s.lay.addWidget(s.desc)
+        s.lay.addWidget(muted("Cor do bloco (a primeira bolinha = automática: cor da matéria ou laranja)", 11, 500)); s.cr = ColorRow(blk.get("color", "") if blk else ""); s.lay.addWidget(s.cr)
         b = QHBoxLayout()
         if blk: tr = IBtn("trash", 46, "dark", "Excluir bloco"); tr.clicked.connect(lambda: (setattr(s, "deleted", True), s.accept())); b.addWidget(tr)
         b.addStretch(); sv = QPushButton("Salvar"); sv.setMinimumWidth(140); sv.clicked.connect(s.accept); b.addWidget(sv); s.lay.addLayout(b)
     def result(s):
         a, b = s.t1.time().toString("HH:mm"), s.t2.time().toString("HH:mm")
         if tmin(b) <= tmin(a): b = QTime.fromString(a, "HH:mm").addSecs(3600).toString("HH:mm") if tmin(a) < 23 * 60 else "23:59"
-        return dict(title=s.title.text().strip() or "Novo Bloco", day=s.dc.currentIndex(), start=a, end=b, subject=cbval(s.sub), tag=cbval(s.tag), desc=s.desc.toPlainText().strip())
+        return dict(title=s.title.text().strip() or "Novo Bloco", day=s.dc.currentIndex(), start=a, end=b, subject=cbval(s.sub), tag=cbval(s.tag), desc=s.desc.toPlainText().strip(), color=s.cr.color())
 
 class ScheduleView(QWidget):
     def __init__(s, win):
@@ -68,7 +69,7 @@ class ScheduleView(QWidget):
     @property
     def d(s): return s.win.store.data
     def load(s, sched):
-        s.sched = sched; s.grid.blocks = sched["blocks"] if sched else []; s.grid.update(); wd = (today().weekday() + 1) % 7
+        s.sched = sched; s.grid.cmap = s.d["colors"]["subjects"]; s.grid.blocks = sched["blocks"] if sched else []; s.grid.update(); wd = (today().weekday() + 1) % 7
         for i, l in enumerate(s.dl): l.setStyleSheet(f"font-size:15px;font-weight:700;color:{T['accent'] if i == wd else T['text']}")
     def new_block(s, day, hour):
         if not s.sched: return
@@ -126,7 +127,7 @@ class CycleView(QWidget):
     @property
     def d(s): return s.win.store.data
     def manage(s):
-        if edit_list(s, "Matérias", s.d["subjects"]): s.win.store.save(); s.show_create()
+        if manage(s, s.win.store, "subjects", "Matérias"): s.show_create()
     def show_create(s, can_cancel=False):
         clear_layout(s.rows, 0)
         s.spins = {}; s.cancel.setVisible(can_cancel)
@@ -165,7 +166,7 @@ class CycleView(QWidget):
         for n, bd in s.badges.items(): m = cy["marks"][n]; bd.setText(f"{sum(m) * 100 // max(1, len(m))}%")
         seq = cycle_order(cy); clear_layout(s.chipsrow, 0); s.chipsrow.addWidget(muted("Sequência sugerida:", 12, 600))
         for n in seq[:14]:
-            c = QLabel(n); c.setStyleSheet(f"background:{scolor(n)};color:#ffffff;border-radius:12px;padding:3px 11px;font-size:11px;font-weight:700"); s.chipsrow.addWidget(c)
+            col = subj_color(s.win.store.data, n); c = QLabel(n); c.setStyleSheet(f"background:{col};color:{on_color(col)};border-radius:12px;padding:3px 11px;font-size:11px;font-weight:700"); s.chipsrow.addWidget(c)
         if len(seq) > 14: s.chipsrow.addWidget(muted(f"+{len(seq) - 14}", 12))
         s.chipsrow.addStretch(); s.nextbtn.setText(f"Concluir próxima sessão: {seq[0]}" if seq else "Ciclo completo"); s.nextbtn.setEnabled(bool(seq))
     def after_change(s):
@@ -285,19 +286,39 @@ class SettingsPage(Page):
         r.addStretch(); a.addLayout(r); s.pin = QCheckBox("Barra lateral sempre visível (desmarcado: aparece ao passar o mouse na borda esquerda)"); s.pin.toggled.connect(s.set_pin); a.addWidget(s.pin)
         s.full = QCheckBox("Abrir o aplicativo em tela cheia (F11 alterna a qualquer momento)"); s.full.toggled.connect(lambda v: (s.d["settings"].__setitem__("fullscreen", v), s.st.save())); a.addWidget(s.full)
         s.intro = QCheckBox("Tocar a introdução ao abrir o aplicativo"); s.intro.toggled.connect(lambda v: (s.d["settings"].__setitem__("intro", v), s.st.save())); a.addWidget(s.intro)
-        o = card("Matérias e tags"); r = QHBoxLayout()
-        for t, k in (("Gerenciar matérias", "subjects"), ("Gerenciar tags", "tags")): b = QPushButton(t); b.clicked.connect(lambda _, k=k, t=t: edit_list(s, t, s.d[k]) and s.st.save()); r.addWidget(b)
+        tb = card("Barra lateral — abas visíveis"); tb.addWidget(muted("Desmarque as abas que você não quer ver. Configurações não pode ser ocultada.", 12, 500)); gl = QGridLayout(); gl.setHorizontalSpacing(24); s.tabcb = {}
+        for i, (ic, n) in enumerate(NAV):
+            cb = QCheckBox(n); cb.toggled.connect(lambda v, n=n: s.set_tab(n, v)); gl.addWidget(cb, i // 3, i % 3); s.tabcb[n] = cb
+        s.tabcb["Configurações"].setEnabled(False); tb.addLayout(gl); s.myday = QCheckBox("Mostrar o “Meu Dia” na página Tarefas"); s.myday.toggled.connect(s.set_myday); tb.addWidget(s.myday)
+        o = card("Matérias e tags (nomes e cores)"); r = QHBoxLayout()
+        for t, k in (("Gerenciar matérias", "subjects"), ("Gerenciar tags", "tags")): b = QPushButton(t); b.clicked.connect(lambda _, k=k, t=t: manage(s, s.st, k, t)); r.addWidget(b)
         r.addStretch(); o.addLayout(r)
         dd = card("Dados e sincronização"); s.info = QLabel(); s.info.setWordWrap(True); s.info.setStyleSheet(f"color:{T['muted']}"); dd.addWidget(s.info)
         for t, fn in [("Exportar backup (.json)", s.export), ("Importar backup", s.imp), ("Escolher pasta de sincronização (Google Drive, Dropbox, OneDrive…)", s.pick), ("Sincronizar agora", s.now), ("Remover sincronização", s.unset)]:
             b = QPushButton(t); b.clicked.connect(lambda _, fn=fn: fn()); b.setStyleSheet("text-align:left;padding-left:22px"); b.setMaximumWidth(560); dd.addWidget(b)
-        L.addStretch()
+        dz = card("Zona de perigo"); dz.addWidget(muted("Apaga permanentemente todas as tarefas, blocos de estudo, eventos, ciclos, simulados, redações e configurações deste computador (e do arquivo sincronizado).", 12, 500))
+        wb = QPushButton("Apagar todos os meus dados…"); wb.setStyleSheet(f"background:{RED};color:white"); wb.setMaximumWidth(360); wb.clicked.connect(s.wipe); dz.addWidget(wb)
+        L.addWidget(muted(f"Ômega v{VERSION}", 12, 500)); L.addStretch()
+    def set_tab(s, n, v):
+        h = s.d["settings"]["hidden_tabs"]
+        if v and n in h: h.remove(n)
+        elif not v and n not in h: h.append(n)
+        s.st.save(); s.win.apply_tabs()
+    def set_myday(s, v): s.d["settings"]["hide_myday"] = not v; s.st.save()
+    def wipe(s):
+        name = s.d["settings"]["user"].strip(); need = name or "APAGAR"; dlg = QDialog(s); dlg.setWindowTitle("Apagar todos os dados"); dlg.setMinimumWidth(480); l = QVBoxLayout(dlg); l.setContentsMargins(24, 22, 24, 22); l.setSpacing(12)
+        l.addWidget(heading("Apagar todos os dados?", 24)); m = QLabel(("Esta ação não pode ser desfeita. Para continuar, digite seu nome de usuário:" if name else "Esta ação não pode ser desfeita. Você ainda não definiu um nome de usuário; para continuar, digite APAGAR:") + f"\n\n{need}"); m.setWordWrap(True); l.addWidget(m)
+        ed = QLineEdit(); ed.setPlaceholderText(need); l.addWidget(ed); r = QHBoxLayout(); r.addStretch(); cn = pill("Cancelar", False, 40); ok = QPushButton("Apagar tudo"); ok.setStyleSheet(f"background:{RED};color:white"); ok.setEnabled(False)
+        cn.clicked.connect(dlg.reject); ok.clicked.connect(dlg.accept); ed.textChanged.connect(lambda t: ok.setEnabled(t.strip() == need)); r.addWidget(cn); r.addWidget(ok); l.addLayout(r)
+        if dlg.exec() and ed.text().strip() == need: s.win.wipe_all(); QMessageBox.information(s, "Ômega", "Todos os dados foram apagados.")
     def set_theme(s, mode=None, accent=None):
         c = s.d["settings"]; c["mode"] = mode or c["mode"]; c["accent"] = accent or c["accent"]; s.st.save(); s.win.apply_theme(); s.refresh()
     def set_pin(s, v): s.d["settings"]["pin"] = v; s.st.save(); s.win.apply_pin()
     def refresh(s):
         c = s.d["settings"]; s.bd.setChecked(c["mode"] != "light"); s.bl.setChecked(c["mode"] == "light"); [setattr(w, "sel", w.name == c["accent"]) or w.update() for w in s.sw]
         for cb, v in ((s.pin, c["pin"]), (s.intro, c["intro"]), (s.full, c["fullscreen"])): cb.blockSignals(True); cb.setChecked(v); cb.blockSignals(False)
+        for n, cb in s.tabcb.items(): cb.blockSignals(True); cb.setChecked(n not in c["hidden_tabs"]); cb.blockSignals(False)
+        s.myday.blockSignals(True); s.myday.setChecked(not c["hide_myday"]); s.myday.blockSignals(False)
         s.info.setStyleSheet(f"color:{T['muted']}"); sf = s.st.sync_file(); s.info.setStyleSheet(f"color:{T['muted']}"); s.info.setText(f"Arquivo local: {s.st.local}\nSincronização: {sf if sf else 'desativada'}\n\nTudo é salvo automaticamente. Com uma pasta de sincronização, o app grava o omega_data.json nela e confere mudanças de outros dispositivos a cada minuto.")
     def export(s):
         p, _ = QFileDialog.getSaveFileName(s, "Exportar", "omega_backup.json", "JSON (*.json)")
