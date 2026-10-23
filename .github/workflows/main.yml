@@ -64,7 +64,7 @@ jobs:
           
   macos:
     name: Compilar macOS
-    runs-on: [macos-latest, macos-15, macos-26, macos-14, macos-13]
+    runs-on: [macos-latest]
 
     steps:
       - name: Baixar código
