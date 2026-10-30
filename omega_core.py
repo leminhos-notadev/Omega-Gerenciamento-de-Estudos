@@ -282,7 +282,8 @@ def merge(d):
     for k, v in f.items(): d.setdefault(k, v)
     for k, v in f["settings"].items(): d["settings"].setdefault(k, v)
     for k in ("subjects", "tags"): d["colors"].setdefault(k, {})
-    if isinstance(d["settings"].get("music_loop"), bool): d["settings"]["music_loop"] = "all" if d["settings"]["music_loop"] else "off"
+    ml = d["settings"].get("music_loop")
+    d["settings"]["music_loop"] = ml if ml in ("off", "all", "one") else ("off" if ml is False else "all")   # aceita o valor antigo (true/false) e qualquer valor inválido
     d["settings"]["hidden_tabs"] = [n for n in d["settings"]["hidden_tabs"] if n != "Configurações"]
     if ver < 3:   # versões antigas já vinham com matérias/tags de exemplo: remove se ainda forem as originais
         if d["subjects"] in OLD_SUBJECTS: d["subjects"] = []

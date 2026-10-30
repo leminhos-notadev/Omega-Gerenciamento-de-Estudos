@@ -1,6 +1,10 @@
+#ifndef AppVer
+  #define AppVer "1.2.0"
+#endif
+
 [Setup]
 AppName=Omega
-AppVersion=1.2.0
+AppVersion={#AppVer}
 DefaultDirName={autopf}\Omega
 DefaultGroupName=Omega
 OutputDir=..\installer_out

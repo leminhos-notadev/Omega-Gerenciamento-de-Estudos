@@ -115,6 +115,7 @@ class Intro(QWidget):
         a3 = ease(cl((t - .24) / .2)) * fade; f.setPixelSize(int(h * .045)); p.setFont(f); p.setOpacity(a3); p.setPen(QColor(T["muted"])); p.drawText(QRectF(0, h * .79 + 10 * (1 - a3), w, h * .08), Qt.AlignCenter, "Gerenciamento de Estudos")
 
 def main():
+    if "--version" in sys.argv: print(f"Omega {VERSION}\nArquivos em: {Path(__file__).resolve().parent}"); return
     app = QApplication(sys.argv); app.setApplicationName("Ômega")
     for f in (RES / "fonts").glob("*.ttf"): QFontDatabase.addApplicationFont(str(f))
     app.setStyle("Fusion"); app.setFont(QFont("Poppins", 10)); store = Store(); c = store.data["settings"]; apply_theme(app, c["mode"], c["accent"]); win = Main(store)
