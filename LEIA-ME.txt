@@ -16,6 +16,11 @@ GERAR INSTALADOR / APLICATIVO (icone = assets/icon.png)
   Actions executa .github/workflows/build.yml e entrega o Setup.exe, o .dmg e o
   .tar.gz prontos para baixar.
 
+NOVIDADES DA VERSAO 1.2.1
+  - Correcao: o app nao trava mais ao iniciar com dados de outra versao (repeticao da musica).
+  - "python omega.py --version" mostra a versao e a pasta de onde o codigo esta sendo lido.
+  - O instalador passa a mostrar a versao real do codigo (veja o rodape de Configuracoes).
+
 NOVIDADES DA VERSAO 1.2.0
   - Player: repeticao em 3 modos (desligada / playlist / so a musica atual com "1").
   - Estatisticas: Dia, Semana, Mes, Ano e Total; tempo total e total por tag (cor da tag).

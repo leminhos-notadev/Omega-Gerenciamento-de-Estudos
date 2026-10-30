@@ -7,7 +7,7 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 RES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "assets"
 HOME = Path(os.environ.get("OMEGA_HOME", Path.home() / ".omega"))
 CFG, CACHE = HOME / "config.json", HOME / "cache"
