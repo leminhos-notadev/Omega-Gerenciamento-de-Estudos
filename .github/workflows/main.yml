@@ -4,7 +4,7 @@ name: Gerar instaladores
 on:
   push:
     tags:
-      - "v*"
+      - "v1.2.0"
   workflow_dispatch:
 
 permissions:
